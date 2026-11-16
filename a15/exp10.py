@@ -8,10 +8,8 @@ df = pd.read_csv("breast_cancer_wisconsin - breast_cancer_wisconsin.csv")
 X = df.drop(columns=["diagnosis"])
 y = df["diagnosis"]
 
-# 1. 80:20 train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 
-# 2. Train and compare criterion='gini' vs criterion='entropy'
 for crit in ["gini", "entropy"]:
     dt = DecisionTreeClassifier(criterion=crit, max_depth=4, random_state=42)
     dt.fit(X_train, y_train)
