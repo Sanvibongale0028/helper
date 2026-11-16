@@ -1,52 +1,39 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load dataset
 df = pd.read_csv("GHI_Report (1) - GHI_Report (1).csv")
 factors = ["Economy", "Fam", "Health", "Freedom"]
 
 # Manual five-number summary function
-def five_number_summary(values):
-    s = sorted(values)
+def five_num(data):
+    s = list(data)
     n = len(s)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if s[j] < s[i]:
+                s[i], s[j] = s[j], s[i]
+                
     mid = n // 2
+    med = (s[mid - 1] + s[mid]) / 2 if n % 2 == 0 else s[mid]
+    low = s[:mid]
+    high = s[mid:] if n % 2 == 0 else s[mid + 1:]
     
-    if n % 2 == 0:
-        median = (s[mid - 1] + s[mid]) / 2
-        lower = s[:mid]
-        upper = s[mid:]
-    else:
-        median = s[mid]
-        lower = s[:mid]
-        upper = s[mid + 1:]
-        
-    q1 = (lower[len(lower)//2 - 1] + lower[len(lower)//2]) / 2 if len(lower) % 2 == 0 else lower[len(lower)//2]
-    q3 = (upper[len(upper)//2 - 1] + upper[len(upper)//2]) / 2 if len(upper) % 2 == 0 else upper[len(upper)//2]
-    
-    return s[0], q1, median, q3, s[-1]
+    q1 = (low[len(low)//2 - 1] + low[len(low)//2]) / 2 if len(low) % 2 == 0 else low[len(low)//2]
+    q3 = (high[len(high)//2 - 1] + high[len(high)//2]) / 2 if len(high) % 2 == 0 else high[len(high)//2]
+    return s[0], q1, med, q3, s[-1]
 
-# Compute five-number summary, IQR, fences, and outliers for each factor
-summary_rows = []
 for col in factors:
     vals = list(df[col])
-    mn, q1, med, q3, mx = five_number_summary(vals)
+    mn, q1, med, q3, mx = five_num(vals)
     iqr = q3 - q1
-    lf = q1 - 1.5 * iqr
-    uf = q3 + 1.5 * iqr
-    outliers = [round(x, 5) for x in vals if x < lf or x > uf]
+    lf, uf = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    outliers = [round(x, 4) for x in vals if x < lf or x > uf]
     
-    summary_rows.append([col, round(mn, 4), round(q1, 4), round(med, 4), round(q3, 4), round(mx, 4), round(iqr, 4), outliers])
+    print(f"{col:<8} -> Min={mn:.4f}, Q1={q1:.4f}, Med={med:.4f}, Q3={q3:.4f}, Max={mx:.4f}, IQR={iqr:.4f}")
+    print(f"Outliers: {outliers}\n")
 
-res_df = pd.DataFrame(summary_rows, columns=["Attribute", "Min", "Q1", "Median", "Q3", "Max", "IQR", "Outliers"])
-print("=== Five-Number Summary & Outliers ===")
-print(res_df.to_string(index=False), "\n")
-
-# Draw side-by-side box plots
-plt.figure(figsize=(8, 5))
-plt.boxplot([df[col] for col in factors], labels=factors)
-plt.title("Side-by-Side Box Plots of the Four GHI Factors")
-plt.ylabel("Score")
-plt.grid(axis="y", linestyle="--", alpha=0.6)
+plt.boxplot([df[c] for c in factors], tick_labels=factors)
+plt.title("Side-by-Side Box Plots of GHI Factors")
 plt.show()
 
-print("Spread Comparison: Economy has the widest overall range (0.00 to 1.69) and largest IQR (~0.61), indicating the highest dispersion across countries. Freedom has the narrowest IQR (~0.22), while Fam is the only factor with low-end statistical outliers (0.1400 and 0.3029).")
+print("Spread Comparison: Economy has the largest spread (IQR = 0.6143, Range = 1.6904), whereas Freedom has the tightest spread (IQR = 0.2208, Range = 0.6697).")

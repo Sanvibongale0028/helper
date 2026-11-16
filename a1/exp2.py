@@ -1,59 +1,37 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load dataset
 df = pd.read_csv("GHI_Report (1) - GHI_Report (1).csv")
 
-# Function to compute five-number summary manually (no describe() or numpy)
-def five_number_summary(values):
-    s = sorted(values)
-    n = len(s)
-    mid = n // 2
-    
-    # Median
-    if n % 2 == 0:
-        median = (s[mid - 1] + s[mid]) / 2
-        lower_half = s[:mid]
-        upper_half = s[mid:]
-    else:
-        median = s[mid]
-        lower_half = s[:mid]
-        upper_half = s[mid + 1:]
-        
-    # Q1 (median of lower half)
-    m_low = len(lower_half)
-    q1 = (lower_half[m_low // 2 - 1] + lower_half[m_low // 2]) / 2 if m_low % 2 == 0 else lower_half[m_low // 2]
-    
-    # Q3 (median of upper half)
-    m_high = len(upper_half)
-    q3 = (upper_half[m_high // 2 - 1] + upper_half[m_high // 2]) / 2 if m_high % 2 == 0 else upper_half[m_high // 2]
-    
-    return s[0], q1, median, q3, s[-1]
-
-# Compute summary, IQR fences, and outliers for H_Score and Economy
 for col in ["H_Score", "Economy"]:
-    data = list(df[col])
-    minimum, q1, median, q3, maximum = five_number_summary(data)
-    iqr = q3 - q1
-    lower_fence = q1 - 1.5 * iqr
-    upper_fence = q3 + 1.5 * iqr
-    outliers = [x for x in data if x < lower_fence or x > upper_fence]
+    s = list(df[col])
+    n = len(s)
     
-    print(f"--- {col} ---")
-    print(f"Min: {minimum:.4f}, Q1: {q1:.4f}, Median: {median:.4f}, Q3: {q3:.4f}, Max: {maximum:.4f}")
-    print(f"IQR Fences: [{lower_fence:.4f}, {upper_fence:.4f}]")
-    print(f"Outliers: {outliers}\n")
+    # 1. Manual sort
+    for i in range(n):
+        for j in range(i + 1, n):
+            if s[j] < s[i]:
+                s[i], s[j] = s[j], s[i]
+                
+    # 2. Manual Min, Q1, Median, Q3, Max
+    mid = n // 2
+    med = (s[mid - 1] + s[mid]) / 2 if n % 2 == 0 else s[mid]
+    low = s[:mid]
+    high = s[mid:] if n % 2 == 0 else s[mid + 1:]
+    
+    q1 = (low[len(low)//2 - 1] + low[len(low)//2]) / 2 if len(low) % 2 == 0 else low[len(low)//2]
+    q3 = (high[len(high)//2 - 1] + high[len(high)//2]) / 2 if len(high) % 2 == 0 else high[len(high)//2]
+    mn, mx = s[0], s[-1]
+    
+    # 3. Manual IQR and outliers
+    iqr = q3 - q1
+    lf = q1 - 1.5 * iqr
+    uf = q3 + 1.5 * iqr
+    outliers = [x for x in s if x < lf or x > uf]
+    
+    print(f"{col} -> Min={mn}, Q1={q1}, Median={med}, Q3={q3}, Max={mx}")
+    print(f"Fences: ({lf:.4f}, {uf:.4f}) | Outliers: {outliers}\n")
 
-# Draw box plots
-plt.figure(figsize=(8, 4))
-plt.subplot(1, 2, 1)
-plt.boxplot(df["H_Score"])
-plt.title("Box Plot of H_Score")
-plt.ylabel("Value")
-
-plt.subplot(1, 2, 2)
-plt.boxplot(df["Economy"])
-plt.title("Box Plot of Economy")
-
-plt.tight_layout()
+plt.boxplot([df["H_Score"], df["Economy"]], tick_labels=["H_Score", "Economy"])
+plt.title("Box Plots of H_Score and Economy")
 plt.show()

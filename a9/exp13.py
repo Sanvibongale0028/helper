@@ -1,62 +1,75 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+import random
 
-# Load dataset and Z-score normalise the four factors
 df = pd.read_csv("GHI_Report (1) - GHI_Report (1).csv")
-factors = ["Economy", "Fam", "Health", "Freedom"]
+X = df[["Economy", "Fam", "Health", "Freedom"]].values.tolist()
+n = len(X)
+k = 3
 
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(df[factors])
+# 1. Initialize 3 random cluster centres
+random.seed(42)
+centres = [X[i][:] for i in random.sample(range(n), k)]
 
-# Run K-Means for k = 2 to 6 and record SSE and Silhouette Score
-k_values = range(2, 7)
-sse_list = []
-sil_list = []
+# 2. Run K-Means loop
+for _ in range(50):
+    clusters = [[] for _ in range(k)]
+    labels = []
+    
+    # Assign each point to nearest centre
+    for idx, p in enumerate(X):
+        best_c = 0
+        best_dist = sum((p[d] - centres[0][d]) ** 2 for d in range(4)) ** 0.5
+        for c in range(1, k):
+            dist = sum((p[d] - centres[c][d]) ** 2 for d in range(4)) ** 0.5
+            if dist < best_dist:
+                best_dist = dist
+                best_c = c
+        clusters[best_c].append(idx)
+        labels.append(best_c)
+        
+    # Update centres
+    new_centres = []
+    for c in range(k):
+        new_centres.append([sum(X[i][d] for i in clusters[c]) / len(clusters[c]) for d in range(4)])
+        
+    if new_centres == centres:
+        break
+    centres = new_centres
 
-for k in k_values:
-    km = KMeans(n_clusters=k, random_state=42, n_init=10)
-    labels = km.fit_predict(X_scaled)
-    sse_list.append(km.inertia_)
-    sil_list.append(silhouette_score(X_scaled, labels))
-    print(f"k = {k} -> SSE = {km.inertia_:.2f}, Silhouette Score = {sil_list[-1]:.4f}")
+print("Cluster Centres:")
+for c in range(k):
+    print(f"Cluster {c}:", [round(v, 4) for v in centres[c]])
 
-# Plot Elbow Curve (SSE vs k) and Silhouette Score vs k
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+print("\nCluster Sizes:", [len(c) for c in clusters])
 
-axes[0].plot(k_values, sse_list, marker="o", color="darkblue")
-axes[0].set_title("Elbow Curve (SSE vs k)")
-axes[0].set_xlabel("Number of Clusters (k)")
-axes[0].set_ylabel("SSE (Inertia)")
-axes[0].grid(True, linestyle="--", alpha=0.6)
+# 3. Manual Silhouette Coefficient
+sil_total = 0
+for i in range(n):
+    c_i = labels[i]
+    same = [j for j in clusters[c_i] if j != i]
+    a_i = sum(sum((X[i][d] - X[j][d]) ** 2 for d in range(4)) ** 0.5 for j in same) / len(same)
+    
+    b_i = 999999
+    for c in range(k):
+        if c != c_i:
+            other = clusters[c]
+            dist_c = sum(sum((X[i][d] - X[j][d]) ** 2 for d in range(4)) ** 0.5 for j in other) / len(other)
+            if dist_c < b_i:
+                b_i = dist_c
+                
+    sil_total += (b_i - a_i) / (a_i if a_i > b_i else b_i)
 
-axes[1].plot(k_values, sil_list, marker="s", color="darkgreen")
-axes[1].set_title("Silhouette Score vs k")
-axes[1].set_xlabel("Number of Clusters (k)")
-axes[1].set_ylabel("Silhouette Score")
-axes[1].grid(True, linestyle="--", alpha=0.6)
+print("\nSilhouette Coefficient:", round(sil_total / n, 4))
 
-plt.tight_layout()
-plt.show()
+# 4. Mean H_Score per cluster
+print("\nMean H_Score per Cluster:")
+for c in range(k):
+    mean_h = sum(df["H_Score"].iloc[i] for i in clusters[c]) / len(clusters[c])
+    print(f"Cluster {c}: {mean_h:.4f}")
 
-# Best k selection (k=2 achieves the highest silhouette score of 0.4149 and sharpest initial SSE drop)
-best_k = k_values[sil_list.index(max(sil_list))]
-print(f"\nChosen Best k: {best_k} (achieves the highest Silhouette Score of {max(sil_list):.4f} and sharpest SSE drop).")
-
-# Fit final K-Means with best_k and plot Economy vs Health coloured by cluster
-final_km = KMeans(n_clusters=best_k, random_state=42, n_init=10)
-df["Cluster"] = final_km.fit_predict(X_scaled)
-
-plt.figure(figsize=(7, 5))
-for c in range(best_k):
-    subset = df[df["Cluster"] == c]
-    plt.scatter(subset["Economy"], subset["Health"], label=f"Cluster {c}", alpha=0.8)
-
+# 5. Plot Economy vs Health coloured by cluster
+plt.scatter(df["Economy"], df["Health"], c=labels)
 plt.xlabel("Economy")
 plt.ylabel("Health")
-plt.title(f"Economy vs Health Coloured by Final Clusters (k = {best_k})")
-plt.legend()
-plt.grid(True, linestyle="--", alpha=0.5)
 plt.show()

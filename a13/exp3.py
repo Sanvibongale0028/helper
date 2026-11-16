@@ -1,46 +1,43 @@
 import pandas as pd
 
-# Load dataset
 df = pd.read_csv("GHI_Report (1) - GHI_Report (1).csv")
+
+def calc_stats(arr):
+    n = len(arr)
+    mn, mx, tot = arr[0], arr[0], 0.0
+    for x in arr:
+        if x < mn: mn = x
+        if x > mx: mx = x
+        tot += x
+    mean = tot / n
+    sq = 0.0
+    for x in arr:
+        sq += (x - mean) ** 2
+    std = (sq / n) ** 0.5
+    return mn, mx, mean, std
 
 for col in ["Economy", "H_Score"]:
     vals = list(df[col])
-    n = len(vals)
+    v_min, v_max, mean, std = calc_stats(vals)
     
-    # Basic manual statistics
-    v_min = min(vals)
-    v_max = max(vals)
-    mean = sum(vals) / n
-    std = (sum((x - mean) ** 2 for x in vals) / n) ** 0.5
+    # 1. Min-Max to [-1, 1]
+    mm = [((x - v_min) / (v_max - v_min)) * 2 - 1 for x in vals]
     
-    # 1. Min-Max normalisation to [-1, 1]
-    # Formula: ((x - min) / (max - min)) * (new_max - new_min) + new_min
-    minmax_neg1_1 = [((x - v_min) / (v_max - v_min)) * 2 - 1 for x in vals]
+    # 2. Z-Score
+    zs = [(x - mean) / std for x in vals]
     
-    # 2. Z-score normalisation
-    zscore = [(x - mean) / std for x in vals]
-    
-    # 3. Decimal scaling: x / 10^j where j is smallest integer such that max(|x_scaled|) < 1
-    max_abs = max(abs(x) for x in vals)
+    # 3. Decimal Scaling
+    max_abs = v_max if v_max >= -v_min else -v_min
     j = 0
     while max_abs / (10 ** j) >= 1:
         j += 1
-    dec_scaled = [x / (10 ** j) for x in vals]
+    ds = [x / (10 ** j) for x in vals]
     
-    # Helper to summarise stats manually
-    def stats_row(method_name, arr):
-        m = sum(arr) / len(arr)
-        s = (sum((v - m) ** 2 for v in arr) / len(arr)) ** 0.5
-        return [method_name, round(min(arr), 4), round(max(arr), 4), round(m, 4), round(s, 4)]
-        
-    comp_table = pd.DataFrame([
-        stats_row("Original", vals),
-        stats_row("Min-Max [-1, 1]", minmax_neg1_1),
-        stats_row("Z-Score", zscore),
-        stats_row(f"Decimal Scaling (j={j})", dec_scaled)
-    ], columns=["Method", "Min", "Max", "Mean", "Std"])
-    
-    print(f"=== {col}: Normalisation Comparison ===")
-    print(comp_table.to_string(index=False), "\n")
+    print(f"=== {col} Comparison ===")
+    print("Method          | Min     | Max    | Mean   | Std")
+    for name, arr in [("Original", vals), ("Min-Max [-1, 1]", mm), ("Z-Score", zs), (f"Decimal (j={j})", ds)]:
+        a_min, a_max, a_mean, a_std = calc_stats(arr)
+        print(f"{name:<15} | {a_min:>7.4f} | {a_max:>6.4f} | {a_mean:>6.4f} | {a_std:>6.4f}")
+    print()
 
-print("Choice for K-Means: Z-score normalisation is preferred before K-Means because it centers every feature at mean = 0 with equal variance (std = 1), preventing features with wider natural spreads from dominating Euclidean distance calculations while remaining less sensitive to extreme outliers than Min-Max scaling.")
+print("Preferred before K-Means: Z-Score normalisation, because it centers all attributes at mean = 0 with equal standard deviation = 1, preventing wider-scale attributes from dominating Euclidean distance while being less distorted by outliers than Min-Max.")

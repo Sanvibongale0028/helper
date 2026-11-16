@@ -1,74 +1,57 @@
 import pandas as pd
 from itertools import combinations
 
-# Load dataset and build transactions from Assignment 3 Part B
 df = pd.read_csv("flavors_of_cocoa (1) (2) - flavors_of_cocoa (1) (2).csv").dropna(subset=["Review Date"])
 df["Cocoa_Num"] = df["Cocoa Percent"].str.replace("%", "").astype(float)
 top8 = df["Company Location"].value_counts().head(8).index.tolist()
 
-transactions = []
+# Build transactions from Assignment 3 Part B
+txns = []
 for _, row in df.iterrows():
     loc = row["Company Location"] if row["Company Location"] in top8 else "Other"
-    
     cp = row["Cocoa_Num"]
-    c_band = "Cocoa_<70" if cp < 70 else ("Cocoa_=70" if cp == 70 else "Cocoa_>70")
-    
+    cb = "Cocoa_<70" if cp < 70 else ("Cocoa_=70" if cp == 70 else "Cocoa_>70")
     r = row["Rating"]
-    r_class = "Rating_High" if r >= 3.5 else ("Rating_Mid" if r >= 2.75 else "Rating_Low")
-    
+    rc = "Rating_High" if r >= 3.5 else ("Rating_Mid" if r >= 2.75 else "Rating_Low")
     yr = int(row["Review Date"])
-    period = "Period_2006-09" if yr <= 2009 else ("Period_2010-13" if yr <= 2013 else "Period_2014-17")
-    
-    transactions.append(frozenset([loc, c_band, r_class, period]))
+    pb = "Period_2006-09" if yr <= 2009 else ("Period_2010-13" if yr <= 2013 else "Period_2014-17")
+    txns.append(frozenset([loc, cb, rc, pb]))
 
-N = len(transactions)
-min_sup = 0.03
-min_conf = 0.50
+N = len(txns)
+items = sorted({i for t in txns for i in t})
 
-# Find all frequent itemsets with support >= 0.03
-all_items = sorted({item for t in transactions for item in t})
-freq_itemsets = {}
-
+# Frequent itemsets (min_support = 0.03)
+freq = {}
 for k in range(1, 5):
-    for comb in combinations(all_items, k):
-        iset = frozenset(comb)
-        sup = sum(1 for t in transactions if iset.issubset(t)) / N
-        if sup >= min_sup:
-            freq_itemsets[iset] = sup
+    for comb in combinations(items, k):
+        s = frozenset(comb)
+        sup = sum(1 for t in txns if s.issubset(t)) / N
+        if sup >= 0.03:
+            freq[s] = sup
 
-# Generate rules with confidence >= 0.50
+# Generate rules (min_confidence = 0.5)
 rules = []
-for iset, sup_xy in freq_itemsets.items():
+for iset, sup_xy in freq.items():
     if len(iset) > 1:
-        for r_len in range(1, len(iset)):
-            for ant_tuple in combinations(iset, r_len):
-                ant = frozenset(ant_tuple)
+        for r in range(1, len(iset)):
+            for ant in combinations(iset, r):
+                ant = frozenset(ant)
                 cons = iset - ant
-                conf = sup_xy / freq_itemsets[ant]
-                if conf >= min_conf:
-                    lift = conf / freq_itemsets[cons]
-                    rules.append({
-                        "Antecedent": ", ".join(sorted(ant)),
-                        "Consequent": ", ".join(sorted(cons)),
-                        "Support": round(sup_xy, 4),
-                        "Confidence": round(conf, 4),
-                        "Lift": round(lift, 4)
-                    })
+                conf = sup_xy / freq[ant]
+                if conf >= 0.5:
+                    lift = conf / freq[cons]
+                    rules.append((list(ant), list(cons), round(sup_xy, 4), round(conf, 4), round(lift, 4)))
 
-rules_df = pd.DataFrame(rules).sort_values(by="Lift", ascending=False)
-print(f"=== All Generated Rules (Total: {len(rules_df)}) ===")
-print(rules_df.to_string(index=False), "\n")
+rules.sort(key=lambda x: x[4], reverse=True)
 
-print("=== Top 5 Rules by Lift ===")
-print(rules_df.head(5).to_string(index=False), "\n")
+print("All Rules (Antecedent -> Consequent | Support, Confidence, Lift):")
+for r in rules:
+    print(f"{r[0]} -> {r[1]} | sup={r[2]}, conf={r[3]}, lift={r[4]}")
 
-# Show a rule with lift > 1 and a rule with lift < 1 for explanation
-lift_gt1 = rules_df[rules_df["Lift"] > 1].iloc[0]
-lift_lt1 = rules_df[rules_df["Lift"] < 1].iloc[0]
+print("\nTop 5 Rules by Lift:")
+for r in rules[:5]:
+    print(f"{r[0]} -> {r[1]} | sup={r[2]}, conf={r[3]}, lift={r[4]}")
 
-print("=== Lift Interpretation for Two Chosen Rules ===")
-print(f"1. Lift > 1 Rule: [{lift_gt1['Antecedent']}] -> [{lift_gt1['Consequent']}] (Lift = {lift_gt1['Lift']})")
-print("   Meaning: Positive association — these items occur together ~1.50 times more often than expected if they were statistically independent.\n")
-
-print(f"2. Lift < 1 Rule: [{lift_lt1['Antecedent']}] -> [{lift_lt1['Consequent']}] (Lift = {lift_lt1['Lift']})")
-print("   Meaning: Negative association — the presence of the antecedent slightly reduces the likelihood of the consequent occurring compared to its baseline probability.")
+print("\nExplanation:")
+print("1. Lift > 1 (e.g., ['Rating_High', 'Cocoa_=70', 'U.S.A.'] -> ['Period_2014-17'], lift=1.496): Positive association; they appear together ~1.5x more often than expected by chance.")
+print("2. Lift < 1 (e.g., ['Period_2010-13'] -> ['Rating_Mid'], lift=0.9985): Negative association; the antecedent slightly decreases the chance of the consequent occurring.")
