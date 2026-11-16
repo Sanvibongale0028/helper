@@ -1,0 +1,9 @@
+To ensure smooth execution in your local Jupyter Notebook environment, keep these quick environment checks in mind:
+
+    Working Directory & Filenames: Place your .ipynb notebook in the same folder as the .csv files (or update the string inside pd.read_csv(...) to match your exact local file path).
+
+    Required Packages: All scripts use standard Anaconda/Jupyter libraries (pandas, numpy, matplotlib, scikit-learn). The only external package used is mlxtend in Assignment 13, Part B — if you don't have it installed yet, run !pip install mlxtend in a Jupyter cell before executing that block.
+
+    Cell Independence: Every Part A and Part B block is written as a standalone cell with its own imports and pd.read_csv() call, except Assignment 5, Part B, which directly reuses the cleaned df created in Assignment 5, Part A (run Part A first, then Part B).
+
+    Matplotlib Version Note: In Assignment 8 (Part A) and Assignment 16 (Part A), plt.boxplot(..., labels=...) works on standard Matplotlib versions; if your local Jupyter environment runs Matplotlib 3.9+ and shows a deprecation warning for labels, simply change labels= to tick_labels=.
